@@ -1,0 +1,4 @@
+# Demo integration preview
+Use Binance Demo Trading (not live and not Spot Testnet). Create HMAC API credentials inside the Demo account and set BINANCE_DEMO_API_KEY and BINANCE_DEMO_API_SECRET in Vercel sensitive environment variables. Do not paste keys into chat or commit them. Keep ADMIN_PASSWORD_HASH and GITHUB_DATA_TOKEN configured according to SETUP.md. The token requires only read access to the private data repository for this preview.
+Endpoints: /api/demo-status (connectivity); /api/demo-history (recent Spot orders for BTCUSDT, ETHUSDT, SOLUSDT); /api/research (five individual research reports).
+This preview is strictly read-only. The $100 allocation is a research configuration, not the Demo wallet balance. No orders are submitted, no automated scheduler, no AI provider, no write-back history, and no editing risk limits yet. News is unavailable without a verified feed. Orders created elsewhere cannot be attributed to agents. Do not use live credentials.

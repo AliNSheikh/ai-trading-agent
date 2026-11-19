@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { integrationHealth } from '../lib/integrations.js';
 
 const env = process.env.VERCEL_ENV;
@@ -19,5 +19,11 @@ if (env === 'preview' || env === 'production' || direct) {
     process.exitCode = 1;
   }
 }
-await mkdir('public', { recursive: true });
+await mkdir('public/assets', { recursive: true });
+await Promise.all([
+  copyFile('web/office3d.js', 'public/assets/office3d.js'),
+  copyFile('node_modules/three/build/three.module.js', 'public/assets/three.module.js'),
+  copyFile('node_modules/three/build/three.core.js', 'public/assets/three.core.js'),
+  copyFile('node_modules/three/LICENSE', 'public/assets/three-license.txt')
+]);
 await writeFile('public/robots.txt', 'User-agent: *\nDisallow: /\n');

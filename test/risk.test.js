@@ -26,13 +26,15 @@ test('default 0.5% full-loss risk rejects a trade below the exchange minimum', (
 
 test('entries respect risk budgets, fill caps, stale prices, pending orders and emergency stop', () => {
   const input = fixture({
-    ...defaults, dailyLoss: { mode: 'usd', value: 10 }, riskPerTrade: { mode: 'usd', value: 8 }
+    ...defaults, capital: 300, dailyVolume: { mode: 'usd', value: 20 },
+    dailyLoss: { mode: 'usd', value: 10 }, monthlyLoss: { mode: 'usd', value: 10 },
+    riskPerTrade: { mode: 'usd', value: 8 }
   });
   assert.equal(evaluateRisk(input).amount, '7.92');
   input.state.days[day] = { volume: 16, trades: 0, loss: 0 };
   assert.equal(evaluateRisk(input).accepted, false);
   input.state.days[day] = { volume: 0, trades: 3, loss: 0 };
-  assert.match(evaluateRisk(input).reason, /Daily new trade limit/);
+  assert.match(evaluateRisk(input).reason, /Daily order cap/);
   input.state.days[day] = { volume: 0, trades: 0, loss: 7 };
   assert.equal(evaluateRisk(input).accepted, false);
   input.state.days[day].loss = 0;
@@ -54,7 +56,7 @@ test('risk-reducing exit stays within quantity and increments filled volume', ()
   const input = fixture();
   input.state.positions.BTCUSDT = { entryId: 'entry', time: '2026-01-11', price: 100, quantity: 0.10,
     cost: 10, fees: { BTC: 0.0001 }, strategy: 'first' };
-  input.state.days[day] = { volume: 20, trades: 3, loss: 0 };
+  input.state.days[day] = { volume: 20, trades: 1, orders: 2, loss: 0 };
   input.decision.side = 'SELL';
   assert.equal(evaluateRisk(input).amount, '0.10000000');
   const pending = { symbol: 'BTCUSDT', clientId: 'exit', side: 'SELL', strategy: 'second', baseAsset: 'BTC' };

@@ -11,7 +11,9 @@ import market from '../api/market.js';
 import demoStatus from '../api/demo-status.js';
 import { aiOpinion } from '../lib/ai.js';
 import { applyFill, evaluateOrder, resolvePending } from '../lib/orders.js';
-import { defaults, periods } from '../lib/settings.js';
+import { authorizedSettings, defaults, hourSlot, periods } from '../lib/settings.js';
+import { openAIQuality } from '../lib/openai-check.js';
+import { playbookId } from '../lib/playbook.js';
 import { append, changeState, getState, scoped } from '../lib/store.js';
 
 const config = { ...defaults, enabled: false, liveTradingEnabled: false, leverage: 1, maxPosition: 10 };
@@ -30,7 +32,8 @@ function fixture(t) {
     ADMIN_PASSWORD_HASH: 'c'.repeat(32) + ':' + scryptSync('fixture-password', 'c'.repeat(32), 32).toString('hex'),
     GITHUB_DATA_TOKEN: 'fixture-github-key', BINANCE_DEMO_API_KEY: 'fixture-demo-key',
     BINANCE_DEMO_API_SECRET: 'fixture-demo-secret', OPENAI_API_KEY: 'fixture-openai-key', OPENAI_MODEL: 'gpt-4o-mini',
-    VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_SHA: sha, CRON_SECRET: 'fixture-cron-key-long', DEMO_EXECUTION_ENABLED: 'true'
+    VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_SHA: sha, CRON_SECRET: 'fixture-cron-key-long', DEMO_EXECUTION_ENABLED: 'true',
+    DEMO_AUTONOMOUS_ENABLED: 'false'
   };
   const original = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
@@ -129,9 +132,13 @@ function fixture(t) {
     if (apiDelay) await apiDelay;
     const request = JSON.parse(options.body);
     assert.equal(request.tools, undefined);
-    assert.equal(request.max_completion_tokens, 450);
-    const reply = request.messages[0].content.startsWith('Assess')
-      ? { sentiment: 'neutral', explanation: 'Fixture sentiment' } : { explanation: 'Fixture explanation', weakness: 'Fixture weakness' };
+    assert.ok([450, 96].includes(request.max_completion_tokens));
+    const task = request.messages[0].content;
+    const input = JSON.parse(request.messages[1].content);
+    const reply = request.max_completion_tokens === 96 ?
+      { verdict: Object.hasOwn(input, 'planned_risk') ? 'BLOCK' : Object.hasOwn(input, 'fast') ? 'WATCH' : 'UNAVAILABLE' } :
+      task.startsWith('Assess') ? { sentiment: 'neutral', explanation: 'Fixture sentiment' } :
+        { explanation: 'Fixture explanation', weakness: 'Fixture weakness' };
     if (invalidAI) return new Response(null, { status: 503 });
     return json({ usage: { prompt_tokens: 121, completion_tokens: 35 },
       choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(reply) } }] });
@@ -319,7 +326,7 @@ test('a Demo dispatch with an ambiguous response is reconciled without duplicate
   const headers = await signedIn('192.0.2.91');
   assert.equal((await mutation(headers, 'settings', {
     settings: {
-      ...defaults, dailyLoss: { mode: 'usd', value: 10 },
+      ...defaults, capital: 300, dailyLoss: { mode: 'usd', value: 10 },
       riskPerTrade: { mode: 'usd', value: 8 }
     }
   })).code, 200);
@@ -333,7 +340,7 @@ test('a Demo dispatch with an ambiguous response is reconciled without duplicate
   assert.equal(f.orderWrites(), 0);
   await changeState(state => {
     state.activeModel = { id: 'approved-fixture', strategy: state.strategy.id, expiresAt: new Date(Date.now() + 3600000).toISOString(),
-      models: { BTCUSDT: {} } };
+      models: { BTCUSDT: { metrics: { qualified: 30, lowerBound: 0.65, meanReturn: 0.02 } } } };
   });
   args.decision.forecast = { eligible: true, probability: 0.81, model: 'approved-fixture' };
   const decision = await evaluateOrder(args);
@@ -346,4 +353,68 @@ test('a Demo dispatch with an ambiguous response is reconciled without duplicate
   assert.equal((await getState()).positions.BTCUSDT.cost, 7.921);
   assert.equal((await getState()).pending, null);
   assert.equal(f.orderWrites(), 1);
+});
+
+test('a saved pair and risk selection persists while idle and stays under authorized caps', async t => {
+  fixture(t);
+  const headers = await signedIn('192.0.2.102');
+  const settings = { ...authorizedSettings(defaults), pairs: ['DOGEUSDT', 'PAXGUSDT', 'XAUTUSDT'] };
+  assert.equal((await mutation(headers, 'settings', { settings })).code, 200);
+  const next = (await request(control, { headers })).body;
+  assert.deepEqual(next.settings.pairs, settings.pairs);
+  assert.equal(next.settings.maxTrades, 10);
+  assert.equal(next.settings.aiDailyCalls, 240);
+  assert.equal(next.settings.riskPerTrade.value, 3);
+  assert.equal(next.aiHourlyLimit, 10);
+  assert.equal((await mutation(headers, 'settings', { settings: { ...settings, riskPerTrade: { mode: 'usd', value: 3.01 } } })).code, 400);
+});
+
+test('scheduled wide preview runs signed QA and structured OpenAI completions once per deployment and hour', async t => {
+  const f = fixture(t);
+  const args = { headers: { authorization: 'Bearer fixture-cron-key-long' }, query: { research: '1' } };
+  const result = await request(cron, args);
+  assert.equal(result.body.status, 'completed');
+  assert.equal(result.body.qa, 'passed');
+  const state = await getState();
+  assert.equal(state.settings.pairs.length, 17);
+  assert.equal(state.settings.maxTrades, 10);
+  assert.equal(state.settings.aiDailyCalls, 240);
+  assert.equal(state.connectivityBenchmark.status, 'passed');
+  assert.equal(state.connectivityBenchmark.cases.length, 3);
+  assert.equal((await request(cron, args)).body.status, 'duplicate');
+  assert.equal(f.orderWrites(), 0);
+});
+
+test('OpenAI has a hard hourly cap with real accounting and preserves the monthly cost ceiling', async t => {
+  fixture(t);
+  const lease = 'hourly-cap';
+  await changeState(state => {
+    state.settings = authorizedSettings(state.settings);
+    state.lease = { id: lease, until: Date.now() + 60000 };
+  });
+  const quality = await openAIQuality(lease, sha);
+  assert.equal(quality.status, 'passed');
+  for (let i = 0; i < 7; i++) await aiOpinion('Assess', {}, lease);
+  await assert.rejects(aiOpinion('Assess', {}, lease), /budget exhausted/);
+  const state = await getState();
+  assert.equal(state.ai[periods().month].hours[hourSlot()], 10);
+  assert.equal(state.ai[periods().month].days[periods().day], 10);
+  assert.ok(state.ai[periods().month].usd < state.settings.aiMonthlyUsd);
+});
+
+test('autonomous execution does not override the emergency stop or allow an unqualified rule', async t => {
+  const f = fixture(t);
+  process.env.VERCEL_ENV = 'production';
+  process.env.DEMO_AUTONOMOUS_ENABLED = 'true';
+  const args = { headers: { authorization: 'Bearer fixture-cron-key-long' } };
+  assert.equal((await request(cron, args)).body.status, 'completed');
+  assert.equal((await getState()).stopped, true);
+  assert.equal((await getState()).verification, null);
+  await changeState(state => { state.stopped = false; });
+  process.env.VERCEL_GIT_COMMIT_SHA = 'b'.repeat(40);
+  assert.equal((await request(cron, args)).body.status, 'completed');
+  const current = await getState();
+  assert.ok(current.verification.checkedAt > 0);
+  assert.equal(current.autonomousModel ?? null, null);
+  assert.equal(f.orderWrites(), 0);
 });

@@ -1,7 +1,8 @@
 import { administer, RequestError } from '../lib/control.js';
 import { executionAllowed } from '../lib/orders.js';
 import { jsonBody, protect } from '../lib/security.js';
-import { periods } from '../lib/settings.js';
+import { goldPairs, hourSlot, hourlyAiLimit, pairs, periods } from '../lib/settings.js';
+import { autonomyConfigured, entryRules, orderModel } from '../lib/playbook.js';
 import { getState, readData, scope } from '../lib/store.js';
 import { qaThrough } from '../lib/qa.js';
 
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
     const legacy = req.query?.legacy === '1' ? await readData('journal/events.json') : undefined;
     const model = entry => entry ? {
       id: entry.id, version: entry.version, strategy: entry.strategy, createdAt: entry.createdAt, expiresAt: entry.expiresAt,
-      metrics: Object.fromEntries(Object.entries(entry.models).map(([symbol, value]) => [symbol, value.metrics]))
+      metrics: Object.fromEntries(Object.entries(entry.models).map(([symbol, value]) => [symbol, value.rules ?? value.metrics]))
     } : null;
     return res.json({
       mode: 'binance-demo-spot', csrf: admin.csrf, stopped: state.stopped,
@@ -36,9 +37,12 @@ export default async function handler(req, res) {
       day: state.days[day] ?? { volume: 0, trades: 0, loss: 0 }, monthLoss: state.months[month]?.loss ?? 0,
       ai: state.ai[month] ?? { usd: 0, requests: 0, input: 0, output: 0, unconfirmed: 0, days: {} },
       aiCallsToday: state.ai[month]?.days[day] ?? 0,
+      aiCallsThisHour: state.ai[month]?.hours?.[hourSlot()] ?? 0, aiHourlyLimit: hourlyAiLimit,
+      availablePairs: pairs, goldPairs, entryRules, autonomous: autonomyConfigured(),
+      connectivityBenchmark: state.connectivityBenchmark ?? null,
       verifiedAt: state.verification?.checkedAt, cronConfigured: (process.env.CRON_SECRET?.length ?? 0) >= 16,
       legacy, environment: scope(), qaThrough, latestQA: state.latestQA ?? null,
-      feedback: state.feedback ?? null, activeModel: model(state.activeModel), modelProposal: model(state.modelProposal),
+      feedback: state.feedback ?? null, activeModel: model(orderModel(state)), modelProposal: model(state.modelProposal),
       managerReports: Object.values(state.managerReports ?? {}).sort((a, b) => b.day.localeCompare(a.day))
     });
   } catch (error) {

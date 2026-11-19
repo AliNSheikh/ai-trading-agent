@@ -1,6 +1,7 @@
 {
   "buildCommand": "npm test && node scripts/verify-integrations.js",
   "outputDirectory": "public",
+  "regions": ["dxb1"],
   "rewrites": [{ "source": "/", "destination": "/api/dashboard" }],
   "crons": [{ "path": "/api/cron", "schedule": "0 4 * * *" }],
   "functions": {

@@ -9,6 +9,7 @@ import cron from '../api/cron.js';
 import demoHistory from '../api/demo-history.js';
 import demoStatus from '../api/demo-status.js';
 import { aiOpinion } from '../lib/ai.js';
+import { applyFill, evaluateOrder, resolvePending } from '../lib/orders.js';
 import { defaults, periods } from '../lib/settings.js';
 import { append, changeState, getState, scoped } from '../lib/store.js';
 
@@ -45,6 +46,8 @@ function fixture(t) {
   let gate = Promise.resolve();
   let apiDelay = null;
   let orderWrites = 0;
+  let nextOrder = null;
+  let acceptThenTimeout = false;
   const http = t.mock.method(globalThis, 'fetch', async (address, options) => {
     const url = new URL(address);
     assert.equal(options.redirect, 'error');
@@ -75,10 +78,35 @@ function fixture(t) {
           return [start, price, price + 1, price - 1, price, 20, start + 899999];
         }));
       }
-      if (url.pathname === '/api/v3/account') return json({ accountType: 'SPOT', canTrade: true, balances: [] });
+      if (url.pathname === '/api/v3/account') return json({
+        accountType: 'SPOT', canTrade: true, balances: [{ asset: 'USDT', free: '100' }],
+        commissionRates: { buyer: '0', taker: '0.001' }
+      });
+      if (url.pathname === '/api/v3/exchangeInfo') return json({ symbols: [{
+        symbol: 'BTCUSDT', baseAsset: 'BTC', quoteAsset: 'USDT', isSpotTradingAllowed: true,
+        status: 'TRADING', quoteOrderQtyMarketAllowed: true, orderTypes: ['MARKET'],
+        filters: [
+          { filterType: 'LOT_SIZE', stepSize: '0.001', minQty: '0.001', maxQty: '10' },
+          { filterType: 'NOTIONAL', applyMinToMarket: true, minNotional: '5' }
+        ]
+      }] });
       if (url.pathname === '/api/v3/ping') return json({});
       if (url.pathname === '/api/v3/order/test') return json({});
-      if (url.pathname === '/api/v3/order' && options.method === 'POST') orderWrites++;
+      if (url.pathname === '/api/v3/order' && options.method === 'POST') {
+        orderWrites++;
+        assert.ok(acceptThenTimeout);
+        const quote = url.searchParams.get('quoteOrderQty');
+        nextOrder = {
+          symbol: 'BTCUSDT', side: 'BUY', type: 'MARKET', clientOrderId: url.searchParams.get('newClientOrderId'),
+          executedQty: String(Number(quote) / 100), cummulativeQuoteQty: quote, orderId: 998, status: 'FILLED', updateTime: Date.now()
+        };
+        throw Error('Fixture transport timeout after exchange acceptance');
+      }
+      if (url.pathname === '/api/v3/order' && nextOrder?.clientOrderId === url.searchParams.get('origClientOrderId')) return json(nextOrder);
+      if (url.pathname === '/api/v3/myTrades' && url.searchParams.get('orderId') === '998') return json([{
+        id: 726, orderId: 998, symbol: 'BTCUSDT', qty: nextOrder.executedQty, quoteQty: nextOrder.cummulativeQuoteQty,
+        commission: '0.001', commissionAsset: 'USDT'
+      }]);
       throw Error('Unexpected Binance request');
     }
     if (url.origin === 'https://www.coindesk.com') {
@@ -104,7 +132,8 @@ function fixture(t) {
 
   return { files, http, failWrites: value => { failWrites = value; }, newsError: value => { newsError = value; },
     invalidAI: value => { invalidAI = value; }, setGate: value => { gate = value; },
-    apiDelay: value => { apiDelay = value; }, orderWrites: () => orderWrites };
+    apiDelay: value => { apiDelay = value; }, orderWrites: () => orderWrites,
+    allowAmbiguousOrder: () => { acceptThenTimeout = true; } };
 }
 
 async function request(handler, { method = 'GET', body, headers = {}, query, ip = '192.0.2.1' } = {}) {
@@ -256,4 +285,46 @@ test('missing news and provider ambiguity retain spending reservations and preve
   });
   await assert.rejects(aiOpinion('Assess', {}, 'test-budget'), /budget exhausted/);
   assert.equal(f.orderWrites(), 0);
+});
+
+test('authorized runtime probe runs test-order validation without starting a cycle', async t => {
+  const f = fixture(t);
+  const reply = await request(cron, {
+    headers: { authorization: 'Bearer fixture-cron-key-long' }, query: { verify: '1' }
+  });
+  assert.equal(reply.code, 200);
+  assert.equal(reply.body.environment, 'preview');
+  assert.equal(reply.body.services.demoOrderValidation.status, 'connected');
+  assert.equal(reply.body.services.gitHubWrite.status, 'connected');
+  assert.equal(f.orderWrites(), 0);
+  assert.equal((await getState()).head, null);
+});
+
+test('a Demo dispatch with an ambiguous response is reconciled without duplicate order submission', async t => {
+  const f = fixture(t);
+  process.env.VERCEL_ENV = 'production';
+  f.allowAmbiguousOrder();
+  const headers = await signedIn('192.0.2.91');
+  assert.equal((await mutation(headers, 'settings', {
+    settings: {
+      ...defaults, dailyLoss: { mode: 'usd', value: 10 },
+      riskPerTrade: { mode: 'usd', value: 8 }
+    }
+  })).code, 200);
+  assert.equal((await mutation(headers, 'verify')).code, 200);
+  assert.equal((await mutation(headers, 'resume')).code, 200);
+  const leaseId = randomUUID();
+  await changeState(state => { state.lease = { id: leaseId, until: Date.now() + 60000 }; });
+  const args = { leaseId, symbol: 'BTCUSDT', decision: { side: 'BUY', reason: 'Fixture rule' },
+    market: { price: 100, closedAt: new Date(Date.now() - 2000).toISOString() }, prerequisites: true };
+  const decision = await evaluateOrder(args);
+  assert.equal(decision.amount, '7.92');
+  assert.ok(decision.clientId);
+  assert.match((await evaluateOrder(args)).reason, /reconciliation/);
+  assert.equal(f.orderWrites(), 1);
+  const resolved = await resolvePending(await getState(), leaseId);
+  await changeState(state => { applyFill(state, resolved); });
+  assert.equal((await getState()).positions.BTCUSDT.cost, 7.921);
+  assert.equal((await getState()).pending, null);
+  assert.equal(f.orderWrites(), 1);
 });

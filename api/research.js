@@ -1,18 +1,19 @@
-import {protect} from '../lib/security.js';
-import {readData} from '../lib/store.js';
-import {analyze} from '../lib/agents.js';
-import {demo} from '../lib/demo.js';
-export async function reports(settings,journal){
- const symbols=settings.pairs.filter(s=>['BTCUSDT','ETHUSDT','SOLUSDT'].includes(s));
- return Promise.all(symbols.map(async symbol=>{
- const rows=(await demo('/api/v3/klines',{symbol,interval:'15m',limit:32})).filter(c=>Number(c[6])<Date.now());
- return {symbol,time:new Date().toISOString(),agents:analyze(rows,settings,journal.trades??[])};
- }));
-}
-export default async function handler(req,res){
- if(!protect(req,res))return;
- if(req.method!=='GET')return res.status(405).end();
- try{const [settings,journal]=await Promise.all([readData('config/defaults.json'),readData('journal/events.json')]);
- res.status(200).json({mode:'demo-research',execution:false,reports:await reports(settings,journal)});
- }catch{res.status(503).json({error:'Demo research unavailable; no order placed'});}
+import { protect } from '../lib/security.js';
+import { getState, history } from '../lib/store.js';
+
+export default async function handler(req, res) {
+  if (!await protect(req, res)) return;
+  if (req.method !== 'GET') return res.status(405).end();
+  const kind = req.query?.kind === 'audit' ? 'audit' : 'runs';
+  try {
+    const state = await getState();
+    const head = kind === 'audit' ? state.auditHead : state.head;
+    const cursor = req.query?.cursor;
+    if (cursor && (typeof cursor !== 'string' || !/^[a-f0-9-]{36}$/.test(cursor))) {
+      return res.status(400).json({ error: 'Invalid journal cursor' });
+    }
+    return res.json({ mode: 'binance-demo-spot', ...await history(kind, cursor || head, 5) });
+  } catch {
+    return res.status(503).json({ error: 'Demo journal unavailable' });
+  }
 }

@@ -1,8 +1,11 @@
 {
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/api/dashboard"
-    }
-  ]
+  "buildCommand": "npm test && node scripts/verify-integrations.js",
+  "outputDirectory": "public",
+  "rewrites": [{ "source": "/", "destination": "/api/dashboard" }],
+  "crons": [{ "path": "/api/cron", "schedule": "0 4 * * *" }],
+  "functions": {
+    "api/control.js": { "maxDuration": 120 },
+    "api/cron.js": { "maxDuration": 120 },
+    "api/research.js": { "maxDuration": 45 }
+  }
 }

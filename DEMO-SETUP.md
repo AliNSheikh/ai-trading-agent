@@ -1,4 +1,15 @@
-# Demo integration preview
-Use Binance Demo Trading (not live and not Spot Testnet). Create HMAC API credentials inside the Demo account and set BINANCE_DEMO_API_KEY and BINANCE_DEMO_API_SECRET in Vercel sensitive environment variables. Do not paste keys into chat or commit them. Keep ADMIN_PASSWORD_HASH and GITHUB_DATA_TOKEN configured according to SETUP.md. The token requires only read access to the private data repository for this preview.
-Endpoints: /api/demo-status (connectivity); /api/demo-history (recent Spot orders for BTCUSDT, ETHUSDT, SOLUSDT); /api/research (five individual research reports).
-This preview is strictly read-only. The $100 allocation is a research configuration, not the Demo wallet balance. No orders are submitted, no automated scheduler, no AI provider, no write-back history, and no editing risk limits yet. News is unavailable without a verified feed. Orders created elsewhere cannot be attributed to agents. Do not use live credentials.
+# Binance Demo Spot execution
+
+V1 allows a small set of Spot reads and two narrowly constructed write requests on `https://demo-api.binance.com`. The test order request validates credentials and filters without sending an order to the matching engine. Real-exchange hosts and wallet, transfer, withdrawal, leverage, margin and futures paths are prohibited by the server adapter. Exchange and provider credentials stay in server-side Vercel environment variables.
+
+## Enable Demo execution
+
+Production deploys with execution stopped. Preview always blocks filled orders. After the release checks pass, an administrator can set the production `DEMO_EXECUTION_ENABLED` gate, deploy, use **Verify Demo order access**, and explicitly click **Resume Demo execution**. Verification is bound to the source commit and Demo credentials and expires after seven days. **Emergency stop** prevents new dispatch authorizations immediately upon the GitHub write. An order already authorized for dispatch may still be in flight and must be reconciled.
+
+Only a rule-based engine can request a Spot trade. Every entry reserves the entire principal as potential loss plus a fee buffer. This accounts for gaps, slippage and unavailable exits. The $100 defaults risk $0.50 per trade, below the observed BTCUSDT Demo minimum of 5 USDT. Increasing the administrator-approved risk settings can permit qualifying Demo entries. USDT is treated as an approximate USD reporting unit. Filled entry and exit volume both count toward daily volume, and the entry cap permits an exposure-reducing exit even when the daily volume is already at its limit.
+
+## Reconciliation
+
+Order dispatch uses a recorded client order ID. An uncertain response is reconciled with the authenticated order and fill records. A repeated cycle never resends a pending order. Unknown orders, incomplete fills and fees paid in unsupported assets leave a pending reservation and block additional orders. Investigate the order ID in the Demo account and run research again to retry reconciliation. If the exchange cannot confirm the outcome, keep execution stopped and reconcile the journal with the exchange before further trades.
+
+Platform history records decisions, risk evaluations, strategy versions, prices, quantities, fees and realized results. The account-history view also shows recent outside orders with separate attribution and indicates incomplete fee coverage. Outside orders do not contribute to the platform portfolio or learning performance. The application schedules no intrabar monitoring or protective orders. Exits are evaluated in research cycles. Exchange quantity filters can leave dust that requires operator review.

@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {analyze} from '../lib/agents.js';import {authorized} from '../lib/security.js';import {scryptSync} from 'node:crypto';
+test('research cannot approve execution',()=>{const rows=Array.from({length:32},(_,i)=>[0,0,0,0,100+i]);const a=analyze(rows,{capital:100});assert.equal(a.length,5);assert.equal(a[3].status,'blocked');});
+test('bad market data rejected',()=>assert.throws(()=>analyze([],{capital:100})));
+test('auth fails closed',()=>{assert.equal(authorized('',''),false);const salt='a'.repeat(32);const hash=salt+':'+scryptSync('example-only',salt,32).toString('hex');assert.equal(authorized('Basic '+Buffer.from('admin:wrong').toString('base64'),hash),false);assert.equal(authorized('Basic '+Buffer.from('admin:example-only').toString('base64'),hash),true);});

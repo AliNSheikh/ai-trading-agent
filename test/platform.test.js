@@ -7,6 +7,7 @@ import control from '../api/control.js';
 import research from '../api/research.js';
 import cron from '../api/cron.js';
 import demoHistory from '../api/demo-history.js';
+import market from '../api/market.js';
 import demoStatus from '../api/demo-status.js';
 import { aiOpinion } from '../lib/ai.js';
 import { applyFill, evaluateOrder, resolvePending } from '../lib/orders.js';
@@ -83,7 +84,8 @@ function fixture(t) {
         commissionRates: { buyer: '0', taker: '0.001' }
       });
       if (url.pathname === '/api/v3/exchangeInfo') return json({ symbols: [{
-        symbol: 'BTCUSDT', baseAsset: 'BTC', quoteAsset: 'USDT', isSpotTradingAllowed: true,
+        symbol: url.searchParams.get('symbol'), baseAsset: url.searchParams.get('symbol').replace(/USDT$/, ''),
+        quoteAsset: 'USDT', isSpotTradingAllowed: true,
         status: 'TRADING', quoteOrderQtyMarketAllowed: true, orderTypes: ['MARKET'],
         filters: [
           { filterType: 'LOT_SIZE', stepSize: '0.001', minQty: '0.001', maxQty: '10' },
@@ -166,7 +168,7 @@ const mutation = (headers, action, extra = {}) => request(control, {
 
 test('all private routes reject unauthenticated access and root shows a CSP-protected sign-in form', async t => {
   fixture(t);
-  for (const handler of [control, research, demoStatus, demoHistory, cron]) {
+  for (const handler of [control, research, demoStatus, demoHistory, market, cron]) {
     assert.equal((await request(handler)).code, 401);
   }
   const root = await request(dashboard);
@@ -240,7 +242,10 @@ test('authenticated cycle journals all agents, budgets usage and deduplicates ov
   const overview = (await request(control, { headers })).body;
   const journal = (await request(research, { headers })).body;
   assert.equal(journal.items.length, 1);
-  assert.equal(journal.items[0].agents.length, 5);
+  assert.equal(journal.items[0].agents.length, 6);
+  assert.equal(overview.managerReports[0].cycles, 1);
+  assert.equal(overview.latest['General Manager'].status, 'complete');
+  assert.ok(journal.items[0].decisions.filter(item => item.side === 'HOLD').every(item => item.risk.code === 'hold'));
   assert.equal(overview.ai.requests, 2);
   assert.equal(overview.ai.input, 242);
   assert.equal(overview.ai.unconfirmed, 0);
@@ -317,6 +322,13 @@ test('a Demo dispatch with an ambiguous response is reconciled without duplicate
   await changeState(state => { state.lease = { id: leaseId, until: Date.now() + 60000 }; });
   const args = { leaseId, symbol: 'BTCUSDT', decision: { side: 'BUY', reason: 'Fixture rule' },
     market: { price: 100, closedAt: new Date(Date.now() - 2000).toISOString() }, prerequisites: true };
+  assert.match((await evaluateOrder(args)).reason, /high-confidence/);
+  assert.equal(f.orderWrites(), 0);
+  await changeState(state => {
+    state.activeModel = { id: 'approved-fixture', strategy: state.strategy.id, expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      models: { BTCUSDT: {} } };
+  });
+  args.decision.forecast = { eligible: true, probability: 0.81, model: 'approved-fixture' };
   const decision = await evaluateOrder(args);
   assert.equal(decision.amount, '7.92');
   assert.ok(decision.clientId);

@@ -17,6 +17,9 @@ export default async function handler(req, res) {
       const available = Object.values(services).every(service => service.status === 'connected');
       return res.status(available ? 200 : 503).json({ environment, region: process.env.VERCEL_REGION, services });
     }
+    if (environment === 'preview' && req.query?.research === '1') {
+      return res.json(await runCycle('preview-verification'));
+    }
     if (environment !== 'production') return res.status(401).end();
     return res.json(await runCycle('schedule'));
   } catch {

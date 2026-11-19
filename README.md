@@ -1,6 +1,6 @@
 # AI Trading Agent V1.0
 
-A private Binance Demo Spot dashboard and research system. It tracks an allocated portfolio separately from the exchange wallet. The market, news, strategy, risk and learning agents have separate journal entries. Only the deterministic server-side execution code has access to the narrowly scoped order adapter.
+A private Binance Demo Spot dashboard and research system. It tracks an allocated portfolio separately from the exchange wallet. The market, news, strategy, risk, learning and general manager agents have separate journal entries. The light dashboard includes interactive charts, a research office, daily reports and Demo QA status. Only the deterministic server-side execution code has access to the narrowly scoped order adapter.
 
 ## Run and release
 

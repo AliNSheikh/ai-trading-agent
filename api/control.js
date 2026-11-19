@@ -2,7 +2,8 @@ import { administer, RequestError } from '../lib/control.js';
 import { executionAllowed } from '../lib/orders.js';
 import { jsonBody, protect } from '../lib/security.js';
 import { periods } from '../lib/settings.js';
-import { getState, readData } from '../lib/store.js';
+import { getState, readData, scope } from '../lib/store.js';
+import { qaThrough } from '../lib/qa.js';
 
 export default async function handler(req, res) {
   const admin = await protect(req, res, { mutation: req.method === 'POST' });
@@ -21,6 +22,10 @@ export default async function handler(req, res) {
     const state = await getState();
     const { day, month } = periods();
     const legacy = req.query?.legacy === '1' ? await readData('journal/events.json') : undefined;
+    const model = entry => entry ? {
+      id: entry.id, version: entry.version, strategy: entry.strategy, createdAt: entry.createdAt, expiresAt: entry.expiresAt,
+      metrics: Object.fromEntries(Object.entries(entry.models).map(([symbol, value]) => [symbol, value.metrics]))
+    } : null;
     return res.json({
       mode: 'binance-demo-spot', csrf: admin.csrf, stopped: state.stopped,
       readyToResume: executionAllowed(state) && !state.pending, running: state.lease?.until > Date.now(),
@@ -32,7 +37,9 @@ export default async function handler(req, res) {
       ai: state.ai[month] ?? { usd: 0, requests: 0, input: 0, output: 0, unconfirmed: 0, days: {} },
       aiCallsToday: state.ai[month]?.days[day] ?? 0,
       verifiedAt: state.verification?.checkedAt, cronConfigured: (process.env.CRON_SECRET?.length ?? 0) >= 16,
-      legacy
+      legacy, environment: scope(), qaThrough, latestQA: state.latestQA ?? null,
+      feedback: state.feedback ?? null, activeModel: model(state.activeModel), modelProposal: model(state.modelProposal),
+      managerReports: Object.values(state.managerReports ?? {}).sort((a, b) => b.day.localeCompare(a.day))
     });
   } catch (error) {
     if (error instanceof RequestError) return res.status(error.status).json({ error: error.message });

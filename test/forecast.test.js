@@ -71,7 +71,8 @@ test('error feedback records recurring agent failures and loses no P&L attributi
 
 test('dated Demo QA continues to the end of November 30 GST and retries degraded checks after four hours', () => {
   const first = Date.parse('2026-11-30T03:00:00+04:00');
-  const failed = { day: '2026-11-30', completedAt: new Date(first).toISOString(), status: 'degraded' };
+  const failed = { day: '2026-11-30', deployment: process.env.VERCEL_GIT_COMMIT_SHA,
+    completedAt: new Date(first).toISOString(), status: 'degraded' };
   assert.equal(qaDue(null, first), true);
   assert.equal(qaDue(failed, first + 3600000), false);
   assert.equal(qaDue(failed, first + 4 * 3600000), true);

@@ -42,6 +42,7 @@ function fixture(t) {
   });
 
   let failWrites = false;
+  let appendConflict = null;
   let newsError = false;
   let invalidAI = false;
   let gate = Promise.resolve();
@@ -61,6 +62,10 @@ function fixture(t) {
       if (options.method === 'PUT') {
         const request = JSON.parse(options.body);
         if (failWrites) return new Response(null, { status: 403 });
+        if (appendConflict === path) {
+          appendConflict = null;
+          return new Response(null, { status: 409 });
+        }
         if (old && etag(old) !== request.sha || !old && request.sha) return new Response(null, { status: 409 });
         files.set(path, JSON.parse(Buffer.from(request.content, 'base64')));
         return json({});
@@ -133,6 +138,7 @@ function fixture(t) {
   });
 
   return { files, http, failWrites: value => { failWrites = value; }, newsError: value => { newsError = value; },
+    conflictOnAppend: path => { appendConflict = path; },
     invalidAI: value => { invalidAI = value; }, setGate: value => { gate = value; },
     apiDelay: value => { apiDelay = value; }, orderWrites: () => orderWrites,
     allowAmbiguousOrder: () => { acceptThenTimeout = true; } };
@@ -210,7 +216,7 @@ test('persistent login rate limits, CSRF protection, session expiry and logout f
 });
 
 test('GitHub CAS retries divergent writes and immutable records deduplicate', async t => {
-  fixture(t);
+  const f = fixture(t);
   await changeState(state => { state.realized = 0; });
   await Promise.all([
     changeState(state => { state.realized += 1; }),
@@ -218,6 +224,7 @@ test('GitHub CAS retries divergent writes and immutable records deduplicate', as
   ]);
   assert.equal((await getState()).realized, 3);
   const path = scoped('runs/deduplicate.json');
+  f.conflictOnAppend(path);
   await append(path, { id: 'deduplicate', result: 'first' });
   await append(path, { id: 'deduplicate', result: 'first' });
   await assert.rejects(append(path, { id: 'deduplicate', result: 'changed' }), /Concurrent/);

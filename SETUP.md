@@ -1,0 +1,5 @@
+# AI Trading Agent — foundation build
+Private research-only dashboard. No order, balance, transfer or withdrawal endpoints exist. Do not add real exchange credentials.
+Import this repository into Vercel as Other, after granting access. Set ADMIN_PASSWORD_HASH in Vercel using locally generated scrypt salt and digest:
+`node -e "const c=require('crypto');const s=c.randomBytes(16).toString('hex');const p=process.argv[1];if(!p||p.length<16)process.exit(1);console.log(s+':'+c.scryptSync(p,s,32).toString('hex'))" YOUR_LONG_UNIQUE_PASSWORD`
+Use a secure local terminal and clear history or use a password prompt instead. Never commit secrets. Set GITHUB_DATA_TOKEN to a fine-grained token with read-only Contents access to ai-trading-data. Login as admin. This version uses HTTP Basic auth over HTTPS; MFA, distributed rate limiting, AI API integration, persistence of analysis, strategy editing, simulated execution, scheduling and backtesting are not implemented yet. Do not use it for live trading. Run npm test locally. Public testnet candles are the only exchange integration.

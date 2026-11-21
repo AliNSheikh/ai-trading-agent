@@ -6,7 +6,7 @@ import { authorizedSettings, defaults, defaultStrategy, periods, validateSetting
 
 test('normal settings enforce risk and count caps while accepting both gold pairs', () => {
   const settings = authorizedSettings(defaults);
-  assert.equal(settings.pairs.length, 17);
+  assert.equal(settings.pairs.length, 3);
   assert.equal(settings.aiMonthlyUsd, defaults.aiMonthlyUsd);
   assert.equal(settings.capital, defaults.capital);
   assert.deepEqual(settings.dailyLoss, defaults.dailyLoss);
@@ -29,7 +29,7 @@ test('the fixed playbook detects breakout, trend, pullback and reversion from cl
 test('eligible sizes respect Demo minima plus the fee buffer and daily cap reserves exits', () => {
   const now = Date.UTC(2026, 10, 19, 18);
   const { day } = periods(now);
-  const state = { settings: authorizedSettings(defaults), stopped: false, pending: null, positions: {},
+  const state = { settings: { ...authorizedSettings(defaults), maxTrades: 10, riskPerTrade: { mode: 'percent', value: 3 }, pairs: ['DOGEUSDT', 'PAXGUSDT'] }, stopped: false, pending: null, positions: {},
     realized: 0, days: { [day]: { volume: 0, orders: 0, trades: 0, loss: 0 } }, months: {} };
   const input = { state, verified: true, now, market: { price: 10, closedAt: new Date(now - 1000).toISOString() },
     decision: { side: 'BUY' }, symbol: 'DOGEUSDT',

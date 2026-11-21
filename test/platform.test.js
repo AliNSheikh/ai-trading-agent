@@ -362,9 +362,9 @@ test('a saved pair and risk selection persists while idle and stays under author
   assert.equal((await mutation(headers, 'settings', { settings })).code, 200);
   const next = (await request(control, { headers })).body;
   assert.deepEqual(next.settings.pairs, settings.pairs);
-  assert.equal(next.settings.maxTrades, 10);
-  assert.equal(next.settings.aiDailyCalls, 240);
-  assert.equal(next.settings.riskPerTrade.value, 3);
+  assert.equal(next.settings.maxTrades, 3);
+  assert.equal(next.settings.aiDailyCalls, 12);
+  assert.equal(next.settings.riskPerTrade.value, 0.5);
   assert.equal(next.aiHourlyLimit, 10);
   assert.equal((await mutation(headers, 'settings', { settings: { ...settings, riskPerTrade: { mode: 'usd', value: 3.01 } } })).code, 400);
 });
@@ -376,9 +376,9 @@ test('scheduled wide preview runs signed QA and structured OpenAI completions on
   assert.equal(result.body.status, 'completed');
   assert.equal(result.body.qa, 'passed');
   const state = await getState();
-  assert.equal(state.settings.pairs.length, 17);
-  assert.equal(state.settings.maxTrades, 10);
-  assert.equal(state.settings.aiDailyCalls, 240);
+  assert.equal(state.settings.pairs.length, 3);
+  assert.equal(state.settings.maxTrades, 3);
+  assert.equal(state.settings.aiDailyCalls, 12);
   assert.equal(state.connectivityBenchmark.status, 'passed');
   assert.equal(state.connectivityBenchmark.cases.length, 3);
   assert.equal((await request(cron, args)).body.status, 'duplicate');

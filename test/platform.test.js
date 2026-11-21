@@ -33,7 +33,7 @@ function fixture(t) {
     GITHUB_DATA_TOKEN: 'fixture-github-key', BINANCE_DEMO_API_KEY: 'fixture-demo-key',
     BINANCE_DEMO_API_SECRET: 'fixture-demo-secret', OPENAI_API_KEY: 'fixture-openai-key', OPENAI_MODEL: 'gpt-4o-mini',
     VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_SHA: sha, CRON_SECRET: 'fixture-cron-key-long', DEMO_EXECUTION_ENABLED: 'true',
-    DEMO_AUTONOMOUS_ENABLED: 'false'
+    DEMO_AUTONOMOUS_ENABLED: 'false', DEMO_BRACKET_ENABLED: 'false'
   };
   const original = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);

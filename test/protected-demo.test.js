@@ -53,7 +53,7 @@ test('only Demo hostname receives native linked OPOCO with no withdrawals or liv
  });
  const response=await placeDemoOpoco({symbol:'BTCUSDT',listClientOrderId:'tl-'+'b'.repeat(28),
    workingClientOrderId:'ta-'+'c'.repeat(28),workingPrice:'100.00',
-   workingQuantity:'.09000000',abovePrice:'102.00',belowStopPrice:'98.00'});
+   workingQuantity:'0.09000000',abovePrice:'102.00',belowStopPrice:'98.00'});
  assert.equal(response.orderListId,123);
  assert.equal(count,1);
  await assert.rejects(placeDemoOpoco({symbol:'BTCUSDT',listClientOrderId:'tl-'+'b'.repeat(28),

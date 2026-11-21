@@ -26,7 +26,7 @@ if(env==='preview'||env==='production'){
   const checks=await Promise.all(sample.map(async symbol=>{
     try{const item=await rules(symbol);return {symbol,status:'checked',minimum:item.minimum,
       tickSize:item.tickSize,opocoAllowed:item.opocoAllowed};}
-    catch{return {symbol,status:'unavailable'};}
+    catch(error){return {symbol,status:'unavailable',reason: String(error?.message??'Demo market unavailable').slice(0,95)};}
   }));
   console.log('DEMO BRACKET MARKET CHECK',JSON.stringify(checks));
 }

@@ -1,5 +1,6 @@
 import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { integrationHealth } from '../lib/integrations.js';
+import { rules } from '../lib/demo.js';
 
 const env = process.env.VERCEL_ENV;
 const sha = process.env.VERCEL_GIT_COMMIT_SHA;
@@ -18,6 +19,16 @@ if (env === 'preview' || env === 'production' || direct) {
         Object.values(health).some(item => item.status !== 'connected'))) {
     process.exitCode = 1;
   }
+}
+// Read-only public Demo exchange-filter verification. Never places an order.
+if(env==='preview'||env==='production'){
+  const sample=['BTCUSDT','ETHUSDT','SOLUSDT','DOGEUSDT','XRPUSDT'];
+  const checks=await Promise.all(sample.map(async symbol=>{
+    try{const item=await rules(symbol);return {symbol,status:'checked',minimum:item.minimum,
+      tickSize:item.tickSize,opocoAllowed:item.opocoAllowed};}
+    catch{return {symbol,status:'unavailable'};}
+  }));
+  console.log('DEMO BRACKET MARKET CHECK',JSON.stringify(checks));
 }
 await mkdir('public/assets', { recursive: true });
 await Promise.all([

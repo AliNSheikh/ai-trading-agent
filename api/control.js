@@ -1,5 +1,6 @@
 import { administer, RequestError } from '../lib/control.js';
 import { executionAllowed } from '../lib/orders.js';
+import { entryDiagnostics } from '../lib/entry-diagnostics.js';
 import { jsonBody, protect } from '../lib/security.js';
 import { goldPairs, hourSlot, hourlyAiLimit, pairs, periods } from '../lib/settings.js';
 import { autonomyConfigured, entryRules, orderModel } from '../lib/playbook.js';
@@ -39,6 +40,12 @@ export default async function handler(req, res) {
       aiCallsToday: state.ai[month]?.days[day] ?? 0,
       aiCallsThisHour: state.ai[month]?.hours?.[hourSlot()] ?? 0, aiHourlyLimit: hourlyAiLimit,
       availablePairs: pairs, goldPairs, entryRules, autonomous: autonomyConfigured(),
+      entryDiagnostics: entryDiagnostics(state, {
+        autonomous: autonomyConfigured(),
+        minNotional: Math.min(...state.settings.pairs
+          .map(pair => state.latestQA?.markets?.[pair]?.minimum)
+          .filter(value => Number.isFinite(value) && value > 0).concat([5]))
+      }),
       connectivityBenchmark: state.connectivityBenchmark ?? null,
       verifiedAt: state.verification?.checkedAt, cronConfigured: (process.env.CRON_SECRET?.length ?? 0) >= 16,
       legacy, environment: scope(), qaThrough, latestQA: state.latestQA ?? null,

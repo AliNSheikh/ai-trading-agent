@@ -1,5 +1,7 @@
 import { administer, RequestError } from '../lib/control.js';
 import { executionAllowed } from '../lib/orders.js';
+import { protectedDemoEnabled } from '../lib/protected-demo.js';
+import { entryDiagnostics } from '../lib/entry-diagnostics.js';
 import { jsonBody, protect } from '../lib/security.js';
 import { goldPairs, hourSlot, hourlyAiLimit, pairs, periods } from '../lib/settings.js';
 import { autonomyConfigured, entryRules, orderModel } from '../lib/playbook.js';
@@ -29,16 +31,26 @@ export default async function handler(req, res) {
     } : null;
     return res.json({
       mode: 'binance-demo-spot', csrf: admin.csrf, stopped: state.stopped,
+      training: { enabled: protectedDemoEnabled(), dailyExperimentalCap: 1,
+        usedToday: state.days[day]?.experimental??0, protection: 'Binance native OPOCO linked exits' },
       readyToResume: executionAllowed(state) && !state.pending, running: state.lease?.until > Date.now(),
       execution: !state.stopped && executionAllowed(state) && !state.pending, withdrawals: false, liveTrading: false,
       settings: state.settings, strategy: state.strategy, positions: state.positions, realized: state.realized,
       performance: state.performance, latest: state.latest, proposal: state.proposal, lastCycle: state.lastCycle,
-      pending: state.pending ? { clientId: state.pending.clientId, symbol: state.pending.symbol, time: state.pending.time } : null,
+      pending: state.pending ? { clientId: state.pending.clientId, symbol: state.pending.symbol, time: state.pending.time,
+        kind: state.pending.kind??'market', status: state.pending.status, entryObserved: state.pending.entryObserved === true,
+        orderListId: state.pending.orderListId??null, protectivePlan: state.pending.quote??null } : null,
       day: state.days[day] ?? { volume: 0, trades: 0, loss: 0 }, monthLoss: state.months[month]?.loss ?? 0,
       ai: state.ai[month] ?? { usd: 0, requests: 0, input: 0, output: 0, unconfirmed: 0, days: {} },
       aiCallsToday: state.ai[month]?.days[day] ?? 0,
       aiCallsThisHour: state.ai[month]?.hours?.[hourSlot()] ?? 0, aiHourlyLimit: hourlyAiLimit,
       availablePairs: pairs, goldPairs, entryRules, autonomous: autonomyConfigured(),
+      entryDiagnostics: entryDiagnostics(state, {
+        autonomous: autonomyConfigured(),
+        minNotional: Math.min(...state.settings.pairs
+          .map(pair => state.latestQA?.markets?.[pair]?.minimum)
+          .filter(value => Number.isFinite(value) && value > 0).concat([5]))
+      }),
       connectivityBenchmark: state.connectivityBenchmark ?? null,
       verifiedAt: state.verification?.checkedAt, cronConfigured: (process.env.CRON_SECRET?.length ?? 0) >= 16,
       legacy, environment: scope(), qaThrough, latestQA: state.latestQA ?? null,

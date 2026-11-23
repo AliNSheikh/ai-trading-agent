@@ -33,7 +33,7 @@ function fixture(t) {
     GITHUB_DATA_TOKEN: 'fixture-github-key', BINANCE_DEMO_API_KEY: 'fixture-demo-key',
     BINANCE_DEMO_API_SECRET: 'fixture-demo-secret', OPENAI_API_KEY: 'fixture-openai-key', OPENAI_MODEL: 'gpt-4o-mini',
     VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_SHA: sha, CRON_SECRET: 'fixture-cron-key-long', DEMO_EXECUTION_ENABLED: 'true',
-    DEMO_AUTONOMOUS_ENABLED: 'false', DEMO_MANAGER_TRIALS_ENABLED: 'false'
+    DEMO_AUTONOMOUS_ENABLED: 'false', DEMO_MANAGER_TRIALS_ENABLED: 'false', DEMO_BRACKET_ENABLED: 'false'
   };
   const original = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
@@ -370,9 +370,9 @@ test('a saved pair and risk selection persists while idle and stays under author
   assert.equal((await mutation(headers, 'settings', { settings })).code, 200);
   const next = (await request(control, { headers })).body;
   assert.deepEqual(next.settings.pairs, settings.pairs);
-  assert.equal(next.settings.maxTrades, 10);
-  assert.equal(next.settings.aiDailyCalls, 240);
-  assert.equal(next.settings.riskPerTrade.value, 3);
+  assert.equal(next.settings.maxTrades, 3);
+  assert.equal(next.settings.aiDailyCalls, 12);
+  assert.equal(next.settings.riskPerTrade.value, 0.5);
   assert.equal(next.aiHourlyLimit, 10);
   assert.equal((await mutation(headers, 'settings', { settings: { ...settings, riskPerTrade: { mode: 'usd', value: 3.01 } } })).code, 400);
 });
@@ -384,9 +384,9 @@ test('scheduled wide preview runs signed QA and structured OpenAI completions on
   assert.equal(result.body.status, 'completed');
   assert.equal(result.body.qa, 'passed');
   const state = await getState();
-  assert.equal(state.settings.pairs.length, 17);
-  assert.equal(state.settings.maxTrades, 10);
-  assert.equal(state.settings.aiDailyCalls, 240);
+  assert.equal(state.settings.pairs.length, 3);
+  assert.equal(state.settings.maxTrades, 3);
+  assert.equal(state.settings.aiDailyCalls, 12);
   assert.equal(state.connectivityBenchmark.status, 'passed');
   assert.equal(state.connectivityBenchmark.cases.length, 3);
   assert.equal((await request(cron, args)).body.status, 'duplicate');
@@ -430,6 +430,7 @@ test('autonomous execution does not override the emergency stop or allow an unqu
 test('preview validates the exact manager trial without sending a market order', async t => {
   const f = fixture(t);
   process.env.DEMO_MANAGER_TRIALS_ENABLED = 'true';
+  await changeState(state => { state.settings.pairs = ['DOGEUSDT']; });
   const result = await request(cron, { headers: { authorization: 'Bearer fixture-cron-key-long' }, query: { research: '1' } });
   assert.equal(result.body.trialPreflight, true);
   assert.equal(f.orderWrites(), 0);
@@ -441,7 +442,7 @@ test('manager buys a bounded Demo trial, exits on time, journals the loss, and c
   process.env.DEMO_AUTONOMOUS_ENABLED = 'true';
   process.env.DEMO_MANAGER_TRIALS_ENABLED = 'true';
   f.allowLifecycle();
-  await changeState(state => { state.stopped = false; });
+  await changeState(state => { state.stopped = false; state.settings.pairs = ['DOGEUSDT']; });
   const args = { headers: { authorization: 'Bearer fixture-cron-key-long' } };
   const entry = await request(cron, args);
   assert.equal(entry.body.fills, 1);

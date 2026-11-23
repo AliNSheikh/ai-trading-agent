@@ -51,7 +51,7 @@ test('active native OPOCO remains pending while protective exits are active',asy
     orderListId:123,listOrderStatus:'EXECUTING',orders:[{orderId:1},{orderId:2},{orderId:3}]};
   throw Error('Unexpected endpoint');
  });
- assert.equal(await resolveProtectedDemo({...pending,entryObserved:true}),null);
+ assert.equal(await resolveProtectedDemo({...pending,entryObserved:true,entryFill:{quantity:0.01}}),null);
 });
 
 test('active bracket journals its verified entry once while preserving protection',async t=>{
@@ -71,4 +71,23 @@ test('active bracket journals its verified entry once while preserving protectio
  assert.equal(state.days[periods(now).day].trades,1);
  assert.equal(state.pending.entryObserved,true);
  assert.equal(await resolveProtectedDemo(state.pending),null);
+});
+
+test('base commission reduces sale quantity without a second cash charge',async t=>{
+ const now=Date.now();
+ mockAccount(t,u=>{
+  if(u.pathname==='/api/v3/orderList')return {symbol:'BTCUSDT',listClientOrderId:listId,orderListId:123,
+    listOrderStatus:'ALL_DONE',orders:[{orderId:1},{orderId:2}]};
+  const id=Number(u.searchParams.get('orderId'));
+  const qty=id===1?'0.09':'0.089';
+  const quote=id===1?'9':'9.078';
+  if(u.pathname==='/api/v3/order')return {symbol:'BTCUSDT',orderId:id,side:id===1?'BUY':'SELL',
+    status:'FILLED',executedQty:qty,cummulativeQuoteQty:quote,updateTime:now};
+  if(u.pathname==='/api/v3/myTrades')return [{orderId:id,symbol:'BTCUSDT',qty,quoteQty:quote,
+    commission:'0.001',commissionAsset:id===1?'BTC':'USDT',price:id===1?'100':'102'}];
+  throw Error('Unexpected endpoint');
+ });
+ const fill=await resolveProtectedDemo(pending);
+ assert.ok(Math.abs(fill.netProfit-.077)<1e-6);
+ assert.ok(Math.abs(fill.feeUsd-.101)<1e-6);
 });

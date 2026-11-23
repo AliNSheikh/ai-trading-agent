@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       settings: state.settings, strategy: state.strategy, positions: state.positions, realized: state.realized,
       performance: state.performance, latest: state.latest, proposal: state.proposal, lastCycle: state.lastCycle,
       pending: state.pending ? { clientId: state.pending.clientId, symbol: state.pending.symbol, time: state.pending.time,
-        kind: state.pending.kind??'market', status: state.pending.status, entryObserved: state.pending.entryObserved === true,
+        kind: state.pending.kind??'market', status: state.pending.status, entryObserved: state.pending.entryObserved === true, entryFill: state.pending.entryFill??null,
         orderListId: state.pending.orderListId??null, protectivePlan: state.pending.quote??null } : null,
       day: state.days[day] ?? { volume: 0, trades: 0, loss: 0 }, monthLoss: state.months[month]?.loss ?? 0,
       ai: state.ai[month] ?? { usd: 0, requests: 0, input: 0, output: 0, unconfirmed: 0, days: {} },

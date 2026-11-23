@@ -33,7 +33,7 @@ function fixture(t) {
     GITHUB_DATA_TOKEN: 'fixture-github-key', BINANCE_DEMO_API_KEY: 'fixture-demo-key',
     BINANCE_DEMO_API_SECRET: 'fixture-demo-secret', OPENAI_API_KEY: 'fixture-openai-key', OPENAI_MODEL: 'gpt-4o-mini',
     VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_SHA: sha, CRON_SECRET: 'fixture-cron-key-long', DEMO_EXECUTION_ENABLED: 'true',
-    DEMO_AUTONOMOUS_ENABLED: 'false'
+    DEMO_AUTONOMOUS_ENABLED: 'false', DEMO_MANAGER_TRIALS_ENABLED: 'false'
   };
   const original = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
@@ -53,6 +53,7 @@ function fixture(t) {
   let orderWrites = 0;
   let nextOrder = null;
   let acceptThenTimeout = false;
+  let lifecycle = false;
   const http = t.mock.method(globalThis, 'fetch', async (address, options) => {
     const url = new URL(address);
     assert.equal(options.redirect, 'error');
@@ -88,7 +89,8 @@ function fixture(t) {
         }));
       }
       if (url.pathname === '/api/v3/account') return json({
-        accountType: 'SPOT', canTrade: true, balances: [{ asset: 'USDT', free: '100' }],
+        accountType: 'SPOT', canTrade: true, balances: [{ asset: 'USDT', free: '100' },
+          ...['DOGE','SHIB','PEPE','VTHO'].map(asset => ({ asset, free: '100' }))],
         commissionRates: { buyer: '0', taker: '0.001' }
       });
       if (url.pathname === '/api/v3/exchangeInfo') return json({ symbols: [{
@@ -97,24 +99,30 @@ function fixture(t) {
         status: 'TRADING', quoteOrderQtyMarketAllowed: true, orderTypes: ['MARKET'],
         filters: [
           { filterType: 'LOT_SIZE', stepSize: '0.001', minQty: '0.001', maxQty: '10' },
-          { filterType: 'NOTIONAL', applyMinToMarket: true, minNotional: '5' }
+          { filterType: 'NOTIONAL', applyMinToMarket: true, minNotional: ['DOGEUSDT','SHIBUSDT','PEPEUSDT','VTHOUSDT'].includes(url.searchParams.get('symbol')) ? '1' : '5' }
         ]
       }] });
+      if (url.pathname === '/api/v3/ticker/bookTicker') return json({
+        symbol: url.searchParams.get('symbol'), bidPrice: '99.9', askPrice: '100'
+      });
       if (url.pathname === '/api/v3/ping') return json({});
       if (url.pathname === '/api/v3/order/test') return json({});
       if (url.pathname === '/api/v3/order' && options.method === 'POST') {
         orderWrites++;
-        assert.ok(acceptThenTimeout);
-        const quote = url.searchParams.get('quoteOrderQty');
+        assert.ok(acceptThenTimeout || lifecycle);
+        const side = url.searchParams.get('side');
+        const quantity = side === 'SELL' ? Number(url.searchParams.get('quantity')) : Number(url.searchParams.get('quoteOrderQty')) / 100;
+        const quote = side === 'SELL' ? quantity * 99 : Number(url.searchParams.get('quoteOrderQty'));
         nextOrder = {
-          symbol: 'BTCUSDT', side: 'BUY', type: 'MARKET', clientOrderId: url.searchParams.get('newClientOrderId'),
-          executedQty: String(Number(quote) / 100), cummulativeQuoteQty: quote, orderId: 998, status: 'FILLED', updateTime: Date.now()
+          symbol: url.searchParams.get('symbol'), side, type: 'MARKET', clientOrderId: url.searchParams.get('newClientOrderId'),
+          executedQty: String(quantity), cummulativeQuoteQty: String(quote), orderId: 998, status: 'FILLED', updateTime: Date.now()
         };
-        throw Error('Fixture transport timeout after exchange acceptance');
+        if (acceptThenTimeout) throw Error('Fixture transport timeout after exchange acceptance');
+        return json(nextOrder);
       }
       if (url.pathname === '/api/v3/order' && nextOrder?.clientOrderId === url.searchParams.get('origClientOrderId')) return json(nextOrder);
       if (url.pathname === '/api/v3/myTrades' && url.searchParams.get('orderId') === '998') return json([{
-        id: 726, orderId: 998, symbol: 'BTCUSDT', qty: nextOrder.executedQty, quoteQty: nextOrder.cummulativeQuoteQty,
+        id: 726, orderId: 998, symbol: nextOrder.symbol, qty: nextOrder.executedQty, quoteQty: nextOrder.cummulativeQuoteQty,
         commission: '0.001', commissionAsset: 'USDT'
       }]);
       throw Error('Unexpected Binance request');
@@ -148,7 +156,7 @@ function fixture(t) {
     conflictOnAppend: path => { appendConflict = path; },
     invalidAI: value => { invalidAI = value; }, setGate: value => { gate = value; },
     apiDelay: value => { apiDelay = value; }, orderWrites: () => orderWrites,
-    allowAmbiguousOrder: () => { acceptThenTimeout = true; } };
+    allowAmbiguousOrder: () => { acceptThenTimeout = true; }, allowLifecycle: () => { lifecycle = true; } };
 }
 
 async function request(handler, { method = 'GET', body, headers = {}, query, ip = '192.0.2.1' } = {}) {
@@ -417,4 +425,44 @@ test('autonomous execution does not override the emergency stop or allow an unqu
   assert.ok(current.verification.checkedAt > 0);
   assert.equal(current.autonomousModel ?? null, null);
   assert.equal(f.orderWrites(), 0);
+});
+
+test('preview validates the exact manager trial without sending a market order', async t => {
+  const f = fixture(t);
+  process.env.DEMO_MANAGER_TRIALS_ENABLED = 'true';
+  const result = await request(cron, { headers: { authorization: 'Bearer fixture-cron-key-long' }, query: { research: '1' } });
+  assert.equal(result.body.trialPreflight, true);
+  assert.equal(f.orderWrites(), 0);
+});
+
+test('manager buys a bounded Demo trial, exits on time, journals the loss, and cannot start another that day', async t => {
+  const f = fixture(t);
+  process.env.VERCEL_ENV = 'production';
+  process.env.DEMO_AUTONOMOUS_ENABLED = 'true';
+  process.env.DEMO_MANAGER_TRIALS_ENABLED = 'true';
+  f.allowLifecycle();
+  await changeState(state => { state.stopped = false; });
+  const args = { headers: { authorization: 'Bearer fixture-cron-key-long' } };
+  const entry = await request(cron, args);
+  assert.equal(entry.body.fills, 1);
+  let state = await getState();
+  const [pair] = Object.keys(state.positions);
+  assert.ok(state.trial.verifiedFill);
+  assert.equal(state.positions[pair].mode, 'demo-trial');
+  assert.ok(state.positions[pair].cost <= 1.5);
+  assert.ok(state.latest['General Manager'].output.orderPlan.some(row => row.symbol === pair && row.action === 'BUY'));
+  await changeState(state => {
+    state.positions[pair].time = new Date(Date.now() - 2 * 3600000).toISOString();
+    state.lastScheduled.researchHour = null;
+  });
+  const exit = await request(cron, args);
+  assert.equal(exit.body.fills, 1);
+  state = await getState();
+  assert.equal(Object.keys(state.positions).length, 0);
+  assert.ok(state.feedback.completed[0].net < 0);
+  assert.equal(state.feedback.completed[0].symbol, pair);
+  assert.ok(state.dust[pair] > 0);
+  await changeState(state => { state.lastScheduled.researchHour = null; });
+  assert.equal((await request(cron, args)).body.fills, 0);
+  assert.equal(f.orderWrites(), 2);
 });

@@ -1,6 +1,8 @@
 import { administer, RequestError } from '../lib/control.js';
 import { executionAllowed } from '../lib/orders.js';
 import { protectedDemoEnabled } from '../lib/protected-demo.js';
+import { concurrentEnabled } from '../lib/executor.js';
+import { engineSettings } from '../lib/settings.js';
 import { entryDiagnostics } from '../lib/entry-diagnostics.js';
 import { jsonBody, protect } from '../lib/security.js';
 import { goldPairs, hourSlot, hourlyAiLimit, pairs, periods } from '../lib/settings.js';
@@ -31,11 +33,12 @@ export default async function handler(req, res) {
     } : null;
     return res.json({
       mode: 'binance-demo-spot', csrf: admin.csrf, stopped: state.stopped,
-      training: { enabled: protectedDemoEnabled(), dailyExperimentalCap: 1,
+      training: { enabled: protectedDemoEnabled(), dailyExperimentalCap: concurrentEnabled() ? engineSettings(state.settings).entriesPerDay : 1,
         usedToday: state.days[day]?.experimental??0, protection: 'Binance native OPOCO linked exits' },
       readyToResume: executionAllowed(state) && !state.pending, running: state.lease?.until > Date.now(),
       execution: !state.stopped && executionAllowed(state) && !state.pending, withdrawals: false, liveTrading: false,
-      settings: state.settings, strategy: state.strategy, positions: state.positions, realized: state.realized,
+      settings: state.settings, strategy: state.strategy, positions: state.positions, book: state.book ?? {}, engine: state.engineStatus ?? null,
+      engineExecution: concurrentEnabled(), strategyPerformance: state.strategyPerformance ?? {}, realized: state.realized,
       performance: state.performance, latest: state.latest, proposal: state.proposal, lastCycle: state.lastCycle,
       pending: state.pending ? { clientId: state.pending.clientId, symbol: state.pending.symbol, time: state.pending.time,
         kind: state.pending.kind??'market', status: state.pending.status, entryObserved: state.pending.entryObserved === true, entryFill: state.pending.entryFill??null,

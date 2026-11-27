@@ -10,7 +10,7 @@ test('normal settings enforce risk and count caps while accepting both gold pair
   assert.equal(settings.aiMonthlyUsd, defaults.aiMonthlyUsd);
   assert.equal(settings.capital, defaults.capital);
   assert.deepEqual(settings.dailyLoss, defaults.dailyLoss);
-  assert.throws(() => validateSettings({ ...settings, maxTrades: 11 }));
+  assert.throws(() => validateSettings({ ...settings, maxTrades: 61 }));
   assert.throws(() => validateSettings({ ...settings, aiDailyCalls: 241 }));
   assert.throws(() => validateSettings({ ...settings, riskPerTrade: { mode: 'percent', value: 3.001 } }));
   assert.deepEqual(validateSettings({ ...settings, pairs: ['PAXGUSDT', 'XAUTUSDT'] }).pairs, ['PAXGUSDT', 'XAUTUSDT']);

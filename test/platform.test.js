@@ -14,7 +14,7 @@ import { applyFill, evaluateOrder, resolvePending } from '../lib/orders.js';
 import { authorizedSettings, defaults, hourSlot, periods } from '../lib/settings.js';
 import { openAIQuality } from '../lib/openai-check.js';
 import { playbookId } from '../lib/playbook.js';
-import { append, changeState, getState, scoped } from '../lib/store.js';
+import { append, changeState, getState, readData, scoped } from '../lib/store.js';
 
 const config = { ...defaults, enabled: false, liveTradingEnabled: false, leverage: 1, maxPosition: 10 };
 const storeRoot = '/repos/AliNSheikh/ai-trading-data/contents/';
@@ -23,7 +23,7 @@ const json = body => Response.json(body);
 const etag = data => createHash('sha1').update(JSON.stringify(data)).digest('hex');
 const sha = 'a'.repeat(40);
 
-function fixture(t) {
+function fixture(t, { engine = false } = {}) {
   const files = new Map([
     ['config/defaults.json', config],
     ['journal/events.json', { events: [], trades: [] }]
@@ -33,7 +33,8 @@ function fixture(t) {
     GITHUB_DATA_TOKEN: 'fixture-github-key', BINANCE_DEMO_API_KEY: 'fixture-demo-key',
     BINANCE_DEMO_API_SECRET: 'fixture-demo-secret', OPENAI_API_KEY: 'fixture-openai-key', OPENAI_MODEL: 'gpt-4o-mini',
     VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_SHA: sha, CRON_SECRET: 'fixture-cron-key-long', DEMO_EXECUTION_ENABLED: 'true',
-    DEMO_AUTONOMOUS_ENABLED: 'false', DEMO_MANAGER_TRIALS_ENABLED: 'false', DEMO_BRACKET_ENABLED: 'false'
+    DEMO_AUTONOMOUS_ENABLED: 'false', DEMO_MANAGER_TRIALS_ENABLED: 'false', DEMO_BRACKET_ENABLED: 'false',
+    ENGINE_V2: engine ? 'on' : 'off'
   };
   const original = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
@@ -82,9 +83,10 @@ function fixture(t) {
       if (url.pathname === '/api/v3/klines') {
         await gate;
         const end = Math.floor(Date.now() / 900000) * 900000;
-        return json(Array.from({ length: 160 }, (_, index) => {
-          const start = end - (160 - index) * 900000;
-          const price = 100 + index * 0.05 + 3 * Math.sin(index / 8);
+        const count = engine && url.searchParams.get('limit') === '500' ? 500 : 160;
+        return json(Array.from({ length: count }, (_, index) => {
+          const start = end - (count - index) * 900000;
+          const price = 100 + index * 0.05 + 3 * Math.sin(index / 8) + (engine ? 2 * Math.sin(index / 3) : 0);
           return [start, price, price + 1, price - 1, price, 20, start + 899999];
         }));
       }
@@ -385,7 +387,8 @@ test('scheduled wide preview runs signed QA and structured OpenAI completions on
   assert.equal(result.body.qa, 'passed');
   const state = await getState();
   assert.equal(state.settings.pairs.length, 3);
-  assert.equal(state.settings.maxTrades, 3);
+  assert.equal(state.settings.maxTrades, 40, 'release migration lifts the single-trade order cap');
+  assert.equal(state.settings.engine.maxConcurrent, 4);
   assert.equal(state.settings.aiDailyCalls, 12);
   assert.equal(state.connectivityBenchmark.status, 'passed');
   assert.equal(state.connectivityBenchmark.cases.length, 3);
@@ -466,4 +469,19 @@ test('manager buys a bounded Demo trial, exits on time, journals the loss, and c
   await changeState(state => { state.lastScheduled.researchHour = null; });
   assert.equal((await request(cron, args)).body.fills, 0);
   assert.equal(f.orderWrites(), 2);
+});
+
+test('engine cycle runs without any AI service: learns on paper, journals status, and never blocks on missing news', async t => {
+  const f = fixture(t, { engine: true });
+  f.newsError(true);
+  const args = { headers: { authorization: 'Bearer fixture-cron-key-long' }, query: { research: '1' } };
+  const result = await request(cron, args);
+  assert.ok(['completed', 'degraded'].includes(result.body.status), result.body.status);
+  const state = await getState();
+  assert.ok(state.engineStatus, 'engine status is published for the dashboard');
+  assert.equal(state.engineStatus.execution, false, 'execution stays off until DEMO_ENGINE_EXECUTION=true');
+  assert.ok(state.engineStatus.diagnostics.pairs >= 1 && state.engineStatus.diagnostics.fresh >= 1);
+  assert.deepEqual(state.book ?? {}, {});
+  const learning = await readData('v1/preview/learning.json').catch(() => null);
+  assert.ok(learning === null || learning.v === 1);
 });

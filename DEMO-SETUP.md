@@ -15,3 +15,11 @@ The manager's separate Demo trial policy uses at most 1.5 USDT of full-principal
 Order dispatch uses a recorded client order ID. An uncertain response is reconciled with the authenticated order and fill records. A repeated cycle never resends a pending order. Unknown orders, incomplete fills and fees paid in unsupported assets leave a pending reservation and block additional orders. Investigate the order ID in the Demo account and run research again to retry reconciliation. If the exchange cannot confirm the outcome, keep execution stopped and reconcile the journal with the exchange before further trades.
 
 Platform history records decisions, risk evaluations, strategy versions, prices, quantities, fees and realized results. The account-history view also shows recent outside orders with separate attribution and indicates incomplete fee coverage. Outside orders do not contribute to the platform portfolio or learning performance. The application schedules no intrabar monitoring or protective orders. Exits are evaluated in research cycles. Exchange quantity filters can leave dust that requires operator review.
+
+
+## Multi-strategy engine (optional)
+
+* `DEMO_ENGINE_EXECUTION=true` lets the multi-strategy engine place concurrent protected Demo trades. Leave it unset to run the engine in
+  paper-only learning mode. Requires `DEMO_AUTONOMOUS_ENABLED=true` and `DEMO_BRACKET_ENABLED=true`.
+* The cron schedule is `*/15 * * * *` (one cycle per 15-minute candle).
+* See `docs/UPGRADE.md` for rollout and the usage header in `scripts/backtest.js`.

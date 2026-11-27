@@ -50,7 +50,7 @@ to `state.book` with native OPOCO exits on the exchange. Risk-based sizing from 
 wallet, daily volume, portfolio heat, daily loss, monthly loss, concurrency, per-family and per-day counts. Software time-stops
 cancel both OCO legs then market-sell, reconciled by client order ID and never retransmitted after an ambiguous response.
 
-**Operations**: 15-minute cadence, LLM demoted to risk-trimming only (never blocks), `Flatten all` button, strategy leaderboard panel,
+**Operations**: 96 quarter-hour cron entries (see Vercel plans below), LLM demoted to risk-trimming only (never blocks), `Flatten all` button, strategy leaderboard panel,
 `scripts/backtest.js` walk-forward validator.
 
 ## Rollout (recommended)
@@ -61,6 +61,16 @@ cancel both OCO legs then market-sell, reconciled by client order ID and never r
 3. Watch the dashboard leaderboard for 3-7 days. Look for strategies with positive lower bound.
 4. Set `DEMO_ENGINE_EXECUTION=true` and redeploy to a Preview first. Probes will trade at minimum size while evidence accumulates.
 5. Keep `Flatten all` in mind. Review `engine.journal` for what the learner changed and why.
+
+## Vercel plans and cron precision
+
+`vercel.json` lists 96 once-a-day schedules (one per quarter hour). That shape is valid on every plan (Hobby rejects any single schedule that
+fires more than once a day, and allows up to 100 per project). On **Pro** each entry fires on the minute, so the engine sees every 15-minute candle live.
+On **Hobby** each entry may fire anywhere inside its hour, so some runs land on a stale candle. The engine handles this: it evaluates every missed
+candle as a paper trade on the next run (catch-up), so learning is unaffected, but live entries only happen on a fresh candle (under 16 minutes old).
+For exact timing on Hobby, call `/api/cron` every 15 minutes from an external scheduler with the `CRON_SECRET` bearer token.
+
+The first run after deploy warm-starts the learner from the 500 candles it already fetches (about two days of paper trades per pair).
 
 ## Limits you should know about
 

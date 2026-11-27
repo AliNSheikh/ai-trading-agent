@@ -12,8 +12,388 @@
   ],
   "crons": [
     {
-      "path": "/api/cron",
-      "schedule": "*/15 * * * *"
+      "path": "/api/cron?slot=0",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron?slot=1",
+      "schedule": "15 0 * * *"
+    },
+    {
+      "path": "/api/cron?slot=2",
+      "schedule": "30 0 * * *"
+    },
+    {
+      "path": "/api/cron?slot=3",
+      "schedule": "45 0 * * *"
+    },
+    {
+      "path": "/api/cron?slot=4",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron?slot=5",
+      "schedule": "15 1 * * *"
+    },
+    {
+      "path": "/api/cron?slot=6",
+      "schedule": "30 1 * * *"
+    },
+    {
+      "path": "/api/cron?slot=7",
+      "schedule": "45 1 * * *"
+    },
+    {
+      "path": "/api/cron?slot=8",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron?slot=9",
+      "schedule": "15 2 * * *"
+    },
+    {
+      "path": "/api/cron?slot=10",
+      "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron?slot=11",
+      "schedule": "45 2 * * *"
+    },
+    {
+      "path": "/api/cron?slot=12",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron?slot=13",
+      "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron?slot=14",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron?slot=15",
+      "schedule": "45 3 * * *"
+    },
+    {
+      "path": "/api/cron?slot=16",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron?slot=17",
+      "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron?slot=18",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron?slot=19",
+      "schedule": "45 4 * * *"
+    },
+    {
+      "path": "/api/cron?slot=20",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron?slot=21",
+      "schedule": "15 5 * * *"
+    },
+    {
+      "path": "/api/cron?slot=22",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron?slot=23",
+      "schedule": "45 5 * * *"
+    },
+    {
+      "path": "/api/cron?slot=24",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron?slot=25",
+      "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/cron?slot=26",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron?slot=27",
+      "schedule": "45 6 * * *"
+    },
+    {
+      "path": "/api/cron?slot=28",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron?slot=29",
+      "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/cron?slot=30",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron?slot=31",
+      "schedule": "45 7 * * *"
+    },
+    {
+      "path": "/api/cron?slot=32",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron?slot=33",
+      "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/cron?slot=34",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron?slot=35",
+      "schedule": "45 8 * * *"
+    },
+    {
+      "path": "/api/cron?slot=36",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron?slot=37",
+      "schedule": "15 9 * * *"
+    },
+    {
+      "path": "/api/cron?slot=38",
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron?slot=39",
+      "schedule": "45 9 * * *"
+    },
+    {
+      "path": "/api/cron?slot=40",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron?slot=41",
+      "schedule": "15 10 * * *"
+    },
+    {
+      "path": "/api/cron?slot=42",
+      "schedule": "30 10 * * *"
+    },
+    {
+      "path": "/api/cron?slot=43",
+      "schedule": "45 10 * * *"
+    },
+    {
+      "path": "/api/cron?slot=44",
+      "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron?slot=45",
+      "schedule": "15 11 * * *"
+    },
+    {
+      "path": "/api/cron?slot=46",
+      "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/cron?slot=47",
+      "schedule": "45 11 * * *"
+    },
+    {
+      "path": "/api/cron?slot=48",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron?slot=49",
+      "schedule": "15 12 * * *"
+    },
+    {
+      "path": "/api/cron?slot=50",
+      "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron?slot=51",
+      "schedule": "45 12 * * *"
+    },
+    {
+      "path": "/api/cron?slot=52",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron?slot=53",
+      "schedule": "15 13 * * *"
+    },
+    {
+      "path": "/api/cron?slot=54",
+      "schedule": "30 13 * * *"
+    },
+    {
+      "path": "/api/cron?slot=55",
+      "schedule": "45 13 * * *"
+    },
+    {
+      "path": "/api/cron?slot=56",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron?slot=57",
+      "schedule": "15 14 * * *"
+    },
+    {
+      "path": "/api/cron?slot=58",
+      "schedule": "30 14 * * *"
+    },
+    {
+      "path": "/api/cron?slot=59",
+      "schedule": "45 14 * * *"
+    },
+    {
+      "path": "/api/cron?slot=60",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron?slot=61",
+      "schedule": "15 15 * * *"
+    },
+    {
+      "path": "/api/cron?slot=62",
+      "schedule": "30 15 * * *"
+    },
+    {
+      "path": "/api/cron?slot=63",
+      "schedule": "45 15 * * *"
+    },
+    {
+      "path": "/api/cron?slot=64",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron?slot=65",
+      "schedule": "15 16 * * *"
+    },
+    {
+      "path": "/api/cron?slot=66",
+      "schedule": "30 16 * * *"
+    },
+    {
+      "path": "/api/cron?slot=67",
+      "schedule": "45 16 * * *"
+    },
+    {
+      "path": "/api/cron?slot=68",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron?slot=69",
+      "schedule": "15 17 * * *"
+    },
+    {
+      "path": "/api/cron?slot=70",
+      "schedule": "30 17 * * *"
+    },
+    {
+      "path": "/api/cron?slot=71",
+      "schedule": "45 17 * * *"
+    },
+    {
+      "path": "/api/cron?slot=72",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron?slot=73",
+      "schedule": "15 18 * * *"
+    },
+    {
+      "path": "/api/cron?slot=74",
+      "schedule": "30 18 * * *"
+    },
+    {
+      "path": "/api/cron?slot=75",
+      "schedule": "45 18 * * *"
+    },
+    {
+      "path": "/api/cron?slot=76",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron?slot=77",
+      "schedule": "15 19 * * *"
+    },
+    {
+      "path": "/api/cron?slot=78",
+      "schedule": "30 19 * * *"
+    },
+    {
+      "path": "/api/cron?slot=79",
+      "schedule": "45 19 * * *"
+    },
+    {
+      "path": "/api/cron?slot=80",
+      "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron?slot=81",
+      "schedule": "15 20 * * *"
+    },
+    {
+      "path": "/api/cron?slot=82",
+      "schedule": "30 20 * * *"
+    },
+    {
+      "path": "/api/cron?slot=83",
+      "schedule": "45 20 * * *"
+    },
+    {
+      "path": "/api/cron?slot=84",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/cron?slot=85",
+      "schedule": "15 21 * * *"
+    },
+    {
+      "path": "/api/cron?slot=86",
+      "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/cron?slot=87",
+      "schedule": "45 21 * * *"
+    },
+    {
+      "path": "/api/cron?slot=88",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron?slot=89",
+      "schedule": "15 22 * * *"
+    },
+    {
+      "path": "/api/cron?slot=90",
+      "schedule": "30 22 * * *"
+    },
+    {
+      "path": "/api/cron?slot=91",
+      "schedule": "45 22 * * *"
+    },
+    {
+      "path": "/api/cron?slot=92",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron?slot=93",
+      "schedule": "15 23 * * *"
+    },
+    {
+      "path": "/api/cron?slot=94",
+      "schedule": "30 23 * * *"
+    },
+    {
+      "path": "/api/cron?slot=95",
+      "schedule": "45 23 * * *"
     }
   ],
   "functions": {
@@ -21,7 +401,7 @@
       "maxDuration": 120
     },
     "api/cron.js": {
-      "maxDuration": 300
+      "maxDuration": 120
     },
     "api/research.js": {
       "maxDuration": 45

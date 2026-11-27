@@ -102,3 +102,21 @@ test('stale candles never produce new entries', () => {
   const out = analyze({ feed, learning: L, now: feed.BTCUSDT[1499][6] + 3 * 3600000 });
   assert.equal(out.intents.length, 0); assert.equal(out.diagnostics.fresh, 0);
 });
+test('first run warm-starts learning from fetched history; a stale run never skips a candle', () => {
+  const L = newLearning(), end = feed.BTCUSDT[1499][6];
+  const warm = analyze({ feed, learning: L, now: end + 60000 });
+  assert.ok(warm.diagnostics.caughtUp > 20, 'warm start should open historical paper trades, got ' + warm.diagnostics.caughtUp);
+  assert.ok(L.recent.length > 10 && Object.keys(L.arms).length > 10, 'history resolves into outcomes immediately');
+  assert.equal(L.cursorCt, feed.BTCUSDT[1499][6]);
+  const M = newLearning(), cut = Object.fromEntries(Object.entries(feed).map(([s, v]) => [s, v.slice(0, 1400)]));
+  const lateNow = cut.BTCUSDT[1399][6] + 3 * 3600000;               // cron fired hours late
+  const late = analyze({ feed: cut, learning: M, now: lateNow });
+  assert.equal(late.intents.length, 0, 'stale candle never trades live');
+  assert.equal(M.cursorCt, cut.BTCUSDT[1398][6], 'newest stale candle must stay unprocessed');
+  const next = Object.fromEntries(Object.entries(feed).map(([s, v]) => [s, v.slice(0, 1420)]));
+  const again = analyze({ feed: next, learning: M, now: next.BTCUSDT[1419][6] + 60000 });
+  assert.ok(again.diagnostics.caughtUp >= 0 && M.cursorCt === next.BTCUSDT[1419][6]);
+  const twice = analyze({ feed: next, learning: M, now: next.BTCUSDT[1419][6] + 90000 });
+  assert.equal(twice.diagnostics.caughtUp, 0, 'no duplicate catch-up when re-run on the same candle');
+  assert.ok(M.open.length === new Set(M.open.map(o => o.id)).size, 'no duplicate shadows');
+});
